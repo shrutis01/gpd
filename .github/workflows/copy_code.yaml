@@ -1,0 +1,79 @@
+- task: Bash@3
+
+  displayName: 'Copy Code & Replace Environment-Specific Parameters'
+
+  inputs:
+
+    targetType: 'inline'
+
+    script: |
+
+      # Fetch latest changes
+
+      git fetch --all
+
+      # Checkout release branch
+
+      git checkout $(releaseBranch)
+
+      git pull origin $(releaseBranch)
+
+      # Copy the dev folder contents
+
+      mkdir -p temp_copy
+
+      cp -r $(devFolder)/* temp_copy/
+
+      # Checkout QA stage branch
+
+      git checkout $(qaBranch)
+
+      git pull origin $(qaBranch)
+
+      # Copy files to QA folder
+
+      mkdir -p $(qaFolder)
+
+      cp -r temp_copy/* $(qaFolder)/
+
+      # Define paths
+
+      MAPPINGS_FILE="$(qaFolder)/config/env_mappings.json"
+
+      CONFIG_FILE="$(qaFolder)/config/env.json"  # Adjust for your actual config file
+
+      if [[ -f "$MAPPINGS_FILE" ]]; then
+
+        echo "Processing environment-specific replacements..."
+
+        # Read JSON and replace values using jq & sed
+
+        jq -r 'to_entries[] | "\(.key)=\(.value.dev)|\(.value.qa)"' "$MAPPINGS_FILE" | while IFS='=' read -r key values; do
+
+          dev_value=$(echo "$values" | cut -d '|' -f1)
+
+          qa_value=$(echo "$values" | cut -d '|' -f2)
+
+          if [[ -n "$dev_value" && -n "$qa_value" ]]; then
+
+            echo "Replacing $key: $dev_value -> $qa_value"
+
+            sed -i "s|$dev_value|$qa_value|g" "$CONFIG_FILE"
+
+          fi
+
+        done
+
+      else
+
+        echo "No environment mappings file found! Skipping replacements."
+
+      fi
+
+      # Commit and push changes
+
+      git add $(qaFolder)/*
+
+      git commit -m "Copied latest code from $(releaseBranch) to $(qaBranch) and updated environment parameters"
+
+      git push origin $(qaBranch) 
