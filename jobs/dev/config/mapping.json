@@ -1,0 +1,5 @@
+{
+  "ENV": {"dev": "dev", "qa": "qa"},
+  "s3_bucket": {"dev": "dev23456", "qa": "qa23456"},
+  "pool": {"dev": "devpool", "qa": "qapool"}
+}
